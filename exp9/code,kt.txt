@@ -1,0 +1,150 @@
+package com.example.gsmsecurity
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            GSMAppUI()
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GSMAppUI() {
+    var secretKeyKi by remember { mutableStateOf("SECRET123") }
+    var randomRand by remember { mutableStateOf("RANDOM456") }
+    var message by remember { mutableStateOf("Hello GSM") }
+
+    var sresA3 by remember { mutableStateOf("") }
+    var sessionKeyA8 by remember { mutableStateOf("") }
+    var cipherTextA5 by remember { mutableStateOf("") }
+
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE3F2FD))
+            .verticalScroll(scrollState)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text("GSM Security (A3/A5/A8)", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        OutlinedTextField(
+            value = secretKeyKi,
+            onValueChange = { secretKeyKi = it },
+            label = { Text("Secret Key (Ki) - On SIM") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = randomRand,
+            onValueChange = { randomRand = it },
+            label = { Text("Random Challenge (RAND) - From Tower") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = message,
+            onValueChange = { message = it },
+            label = { Text("Message to Encrypt") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = {
+                if (secretKeyKi.isNotBlank() && randomRand.isNotBlank()) {
+                    // Simulate A3 (Outputs 32-bit Signed Response)
+                    val combinedA3 = secretKeyKi + randomRand
+                    val hash32 = combinedA3.hashCode().toUInt()
+                    sresA3 = hash32.toString(16).padStart(8, '0').uppercase()
+
+                    // Simulate A8 (Outputs 64-bit Session Key)
+                    val combinedA8 = randomRand + secretKeyKi
+                    val hash1 = combinedA8.hashCode().toUInt().toLong()
+                    val hash2 = combinedA8.reversed().hashCode().toUInt().toLong()
+                    val kc64 = (hash1 shl 32) or hash2
+                    sessionKeyA8 = kc64.toString(16).padStart(16, '0').uppercase()
+
+                    // Simulate A5 (Stream Cipher Encryption using XOR)
+                    if (message.isNotBlank()) {
+                        val kcBytes = sessionKeyA8.toByteArray()
+                        val msgBytes = message.toByteArray()
+                        val cipherBytes = ByteArray(msgBytes.size)
+
+                        for (i in msgBytes.indices) {
+                            cipherBytes[i] = (msgBytes[i].toInt() xor kcBytes[i % kcBytes.size].toInt()).toByte()
+                        }
+                        cipherTextA5 = cipherBytes.joinToString("") { "%02X".format(it) }
+                    } else {
+                        cipherTextA5 = "No message to encrypt"
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth().height(60.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("RUN GSM ALGORITHMS", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (sresA3.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(4.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("🔐 Authentication SRES (A3):", fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                    Text(sresA3, fontFamily = FontFamily.Monospace, fontSize = 16.sp, color = Color(0xFFD32F2F))
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text("🔑 Session Key Kc (A8):", fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                    Text(sessionKeyA8, fontFamily = FontFamily.Monospace, fontSize = 16.sp, color = Color(0xFF388E3C))
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text("🔏 Encrypted Data (A5):", fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                    Text(cipherTextA5, fontFamily = FontFamily.Monospace, fontSize = 16.sp, color = Color(0xFF1976D2))
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(30.dp))
+    }
+}
